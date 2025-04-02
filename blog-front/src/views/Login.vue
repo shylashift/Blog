@@ -13,6 +13,7 @@ const loginForm = ref({
 })
 
 const loading = ref(false)
+const showPassword = ref(false)
 
 const handleLogin = async () => {
   if (!loginForm.value.username || !loginForm.value.password) {
@@ -56,10 +57,20 @@ const handleLogin = async () => {
         <el-form-item label="密码">
           <el-input
             v-model="loginForm.password"
-            type="password"
+            :type="showPassword ? 'text' : 'password'"
             placeholder="请输入密码"
             @keyup.enter="handleLogin"
-          />
+          >
+            <template #suffix>
+              <el-icon 
+                class="password-icon" 
+                @click="showPassword = !showPassword"
+              >
+                <View v-if="showPassword" />
+                <Hide v-else />
+              </el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item>
           <el-button
@@ -98,5 +109,14 @@ h2 {
   text-align: center;
   margin-bottom: 30px;
   color: #303133;
+}
+
+.password-icon {
+  cursor: pointer;
+  color: #909399;
+}
+
+.password-icon:hover {
+  color: #409EFF;
 }
 </style> 

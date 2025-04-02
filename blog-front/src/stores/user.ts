@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { login as apiLogin } from '@/api/user'
+import api from '@/api/axios'
 
 interface UserInfo {
   id: number
@@ -29,19 +31,7 @@ export const useUserStore = defineStore('user', () => {
   // 登录
   const login = async (username: string, password: string) => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password })
-      })
-
-      if (!response.ok) {
-        throw new Error('登录失败')
-      }
-
-      const data = await response.json()
+      const data = await apiLogin({ username, password })
       setToken(data.token)
       setUserInfo(data.userInfo)
       await fetchUserInfo()
@@ -68,17 +58,12 @@ export const useUserStore = defineStore('user', () => {
     if (!token.value) return
 
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await api.get('/users/me', {
         headers: {
           'Authorization': `Bearer ${token.value}`
         }
       })
-
-      if (!response.ok) {
-        throw new Error('获取用户信息失败')
-      }
-
-      userInfo.value = await response.json()
+      userInfo.value = response.data
     } catch (error) {
       console.error('获取用户信息错误:', error)
       token.value = null
