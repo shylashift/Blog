@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.blogbackend.mapper.UserMapper">
+    <resultMap id="UserWithRoles" type="com.example.blogbackend.entity.User">
+        <id property="userId" column="UserId"/>
+        <result property="username" column="Username"/>
+        <result property="password" column="Password"/>
+        <result property="email" column="Email"/>
+        <result property="avatar" column="Avatar"/>
+        <result property="bio" column="Bio"/>
+        <result property="createdAt" column="CreatedAt"/>
+        <result property="updatedAt" column="UpdatedAt"/>
+        <collection property="roles" ofType="com.example.blogbackend.entity.Role">
+            <id property="roleId" column="RoleId"/>
+            <result property="roleName" column="RoleName"/>
+        </collection>
+    </resultMap>
+
+    <select id="findByEmail" resultMap="UserWithRoles">
+        SELECT u.*, r.RoleId, r.RoleName
+        FROM Users u
+        LEFT JOIN UserRoles ur ON u.UserId = ur.UserId
+        LEFT JOIN Roles r ON ur.RoleId = r.RoleId
+        WHERE u.Email = #{email}
+    </select>
+
+    <select id="findByUsername" resultMap="UserWithRoles">
+        SELECT u.*, r.RoleId, r.RoleName
+        FROM Users u
+        LEFT JOIN UserRoles ur ON u.UserId = ur.UserId
+        LEFT JOIN Roles r ON ur.RoleId = r.RoleId
+        WHERE u.Username = #{username}
+    </select>
+
+    <select id="findByIdWithRoles" resultMap="UserWithRoles">
+        SELECT u.*, r.RoleId, r.RoleName
+        FROM Users u
+        LEFT JOIN UserRoles ur ON u.UserId = ur.UserId
+        LEFT JOIN Roles r ON ur.RoleId = r.RoleId
+        WHERE u.UserId = #{userId}
+    </select>
+</mapper> 
