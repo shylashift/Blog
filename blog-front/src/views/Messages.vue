@@ -1,51 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { ChatDotRound, Star, Document } from '@element-plus/icons-vue'
+import { ChatDotRound, Star } from '@element-plus/icons-vue'
+import { getUserFavorites, removeFavorite, type Favorite } from '@/api/favorites'
+import { getUserComments, deleteComment } from '@/api/comments'
+import type { MessageType } from '@/api/messages'
+import type { Comment } from '@/api/posts'
+import { getAvatarUrl, getBackupAvatar } from '@/utils/avatarUtils'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-// 消息类型
-type MessageType = 'comment' | 'favorite'
-
-// 消息数据接口
-interface Message {
-  id: number
-  type: MessageType
-  title: string
-  content: string
-  author: string
-  postId: number
-  createdAt: string
-  isRead: boolean
-}
-
-// 收藏数据接口
-interface Favorite {
-  id: number
-  postId: number
-  title: string
-  author: string
-  createdAt: string
-}
-
+// 初始化状态
 const activeTab = ref<MessageType>('comment')
-const messages = ref<Message[]>([])
+const comments = ref<Comment[]>([])
 const favorites = ref<Favorite[]>([])
 const loading = ref(false)
 
-// 获取消息列表
-const fetchMessages = async () => {
+// 获取评论列表
+const fetchComments = async () => {
   loading.value = true
   try {
-    // TODO: 调用后端API获取消息列表
-    // const response = await api.getMessages()
-    // messages.value = response.data
+    const response = await getUserComments()
+    comments.value = response
+    console.log('获取到的评论列表:', comments.value)
   } catch (error) {
-    ElMessage.error('获取消息失败')
+    console.error('获取评论失败:', error)
+    ElMessage.error('获取评论失败')
   } finally {
     loading.value = false
   }
@@ -55,38 +38,56 @@ const fetchMessages = async () => {
 const fetchFavorites = async () => {
   loading.value = true
   try {
-    // TODO: 调用后端API获取收藏列表
-    // const response = await api.getFavorites()
-    // favorites.value = response.data
+    const response = await getUserFavorites()
+    console.log('收藏文章原始数据:', JSON.stringify(response));
+    favorites.value = response
+    console.log('获取到的收藏列表:', favorites.value)
   } catch (error) {
+    console.error('获取收藏列表失败:', error)
     ElMessage.error('获取收藏列表失败')
   } finally {
     loading.value = false
   }
 }
 
-// 标记消息为已读
-const markAsRead = async (messageId: number) => {
+// 获取评论用户名称的辅助函数
+const getCommentUserName = (comment: any): string => {
+  if (!comment) return '匿名用户'
+  
+  // 优先使用comment.user.username
+  if (comment.user && comment.user.username && comment.user.username.trim() !== '') {
+    return comment.user.username
+  }
+  
+  // 如果comment中有userName字段
+  if (comment.userName && comment.userName.trim() !== '') {
+    return comment.userName
+  }
+  
+  // 最后返回默认值
+  return '匿名用户'
+}
+
+// 删除评论
+const handleDeleteComment = async (commentId: number) => {
   try {
-    // TODO: 调用后端API标记消息为已读
-    // await api.markMessageAsRead(messageId)
-    const message = messages.value.find(m => m.id === messageId)
-    if (message) {
-      message.isRead = true
-    }
+    await deleteComment(commentId)
+    comments.value = comments.value.filter(c => c.commentId !== commentId)
+    ElMessage.success('评论已删除')
   } catch (error) {
+    console.error('删除评论失败:', error)
     ElMessage.error('操作失败')
   }
 }
 
 // 取消收藏
-const removeFavorite = async (favoriteId: number) => {
+const handleRemoveFavorite = async (favoriteId: number, postId: number) => {
   try {
-    // TODO: 调用后端API取消收藏
-    // await api.removeFavorite(favoriteId)
+    await removeFavorite(postId)
     favorites.value = favorites.value.filter(f => f.id !== favoriteId)
     ElMessage.success('已取消收藏')
   } catch (error) {
+    console.error('取消收藏失败:', error)
     ElMessage.error('操作失败')
   }
 }
@@ -96,53 +97,82 @@ const goToPost = (postId: number) => {
   router.push(`/posts/${postId}`)
 }
 
+// 处理头像加载错误
+const handleAvatarError = (e: Event) => {
+  const target = e.target as HTMLImageElement;
+  target.src = getBackupAvatar();
+}
+
 onMounted(() => {
-  if (!userStore.isAuthenticated) {
+  if (!userStore.isLoggedIn) {
     router.push('/login')
     return
   }
-  fetchMessages()
+  fetchComments()
   fetchFavorites()
+})
+
+// 添加onActivated钩子确保每次从详情页返回时也重新加载数据
+onActivated(() => {
+  console.log('Messages页面被激活，重新加载数据')
+  if (userStore.isLoggedIn) {
+    if (activeTab.value === 'comment') {
+      fetchComments()
+    } else if (activeTab.value === 'favorite') {
+      fetchFavorites()
+    }
+  }
+})
+
+// 添加组件名称以匹配keep-alive
+defineOptions({
+  name: 'Messages'
 })
 </script>
 
 <template>
   <div class="messages-container">
     <div class="messages-header">
-      <h1>学术交流中心</h1>
-      <p class="subtitle">在这里查看您的学术讨论和收藏的文章</p>
+      <h1>评论中心</h1>
+      <p class="subtitle">在这里查看您的评论和收藏的文章</p>
     </div>
 
     <el-tabs v-model="activeTab" class="messages-tabs">
-      <el-tab-pane label="学术讨论" name="comment">
+      <el-tab-pane label="我的评论" name="comment">
         <div class="messages-list" v-loading="loading">
-          <template v-if="messages.length > 0">
-            <div v-for="message in messages" :key="message.id" 
-                 class="message-item" :class="{ 'unread': !message.isRead }"
-                 @click="goToPost(message.postId)">
+          <template v-if="comments.length > 0">
+            <div v-for="comment in comments" :key="comment.commentId" 
+                 class="message-item"
+                 @click="goToPost(comment.postId)">
               <div class="message-icon">
                 <el-icon><ChatDotRound /></el-icon>
               </div>
               <div class="message-content">
-                <h3>{{ message.title }}</h3>
-                <p class="message-text">{{ message.content }}</p>
+                <h3>文章评论</h3>
+                <p class="message-text">{{ comment.content }}</p>
                 <div class="message-meta">
-                  <span class="author">{{ message.author }}</span>
-                  <span class="time">{{ message.createdAt }}</span>
+                  <div class="author-info">
+                    <el-avatar 
+                      :size="24" 
+                      :src="getAvatarUrl(comment.user?.avatar)"
+                      @error="handleAvatarError"
+                    />
+                    <span class="author">{{ getCommentUserName(comment) }}</span>
+                  </div>
+                  <span class="time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
                 </div>
               </div>
               <div class="message-actions">
                 <el-button 
-                  v-if="!message.isRead"
-                  type="primary" 
+                  type="danger" 
                   link
-                  @click.stop="markAsRead(message.id)">
-                  标记已读
+                  @click.stop="handleDeleteComment(comment.commentId)">
+                  删除评论
                 </el-button>
               </div>
             </div>
           </template>
-          <el-empty v-else description="暂无学术讨论消息" />
+          <el-empty v-else description="暂无评论" />
         </div>
       </el-tab-pane>
 
@@ -166,7 +196,7 @@ onMounted(() => {
                 <el-button 
                   type="danger" 
                   link
-                  @click.stop="removeFavorite(favorite.id)">
+                  @click.stop="handleRemoveFavorite(favorite.id, favorite.postId)">
                   取消收藏
                 </el-button>
               </div>
@@ -269,12 +299,34 @@ onMounted(() => {
   gap: 20px;
   color: var(--text-color-secondary);
   font-size: 0.9rem;
+  align-items: center;
+}
+
+.favorite-meta .author {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.favorite-meta .time {
+  color: var(--el-text-color-secondary);
+  font-size: 0.85rem;
 }
 
 .message-actions,
 .favorite-actions {
   display: flex;
   align-items: center;
+}
+
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-meta .author,
+.favorite-meta .author {
+  margin-left: 8px;
 }
 
 @media (max-width: 768px) {

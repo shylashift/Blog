@@ -1,57 +1,90 @@
-# 校园博客系统
+# Blog 前端项目
 
-一个基于Vue 3 + Spring Boot的校园博客系统，采用RBAC权限模型实现多角色管理。
-
-## 功能特性
-
-### 角色权限体系
-- **学生** 
-  - 发帖/评论/浏览
-  - 编辑个人帖子
-  - 收藏优质内容
-  
-- **教师**
-  - 审核帖子内容
-  - 发布公告并置顶
-  - 管理专业板块
-  - 特殊身份标识
-  
-- **管理员**
-  - 用户账户管理
-  - 权限分配
-  - 系统日志监控
-  - 全局内容管理
-
-- 用户注册与登录（带验证码）
-- 登录尝试限制（防止暴力破解）
-- 密码加密存储
-- 博客文章发布
-- 响应式设计
-- 基于JWT的权限验证
+这是一个使用 Vue 3 + TypeScript + Vite 开发的博客系统前端项目。
 
 ## 技术栈
 
-### 前端架构
-```mermaid
-graph TD
-    A[浏览器] --> B[Vue 3]
-    B --> C[Vue Router]
-    B --> D[Pinia状态管理]
-    B --> E[Element Plus]
-    C --> F[动态路由]
-    D --> G[角色状态存储]
+- Vue 3 - 渐进式 JavaScript 框架
+- TypeScript - JavaScript 的超集，添加了类型系统
+- Vite - 下一代前端构建工具
+- Vue Router - Vue.js 的官方路由
+- Pinia - Vue 的状态管理库
+- Ant Design Vue - 基于 Ant Design 的 Vue UI 组件库
+- Axios - 基于 Promise 的 HTTP 客户端
+
+## 项目结构
+
+```
+blog-front/
+├── src/
+│   ├── assets/      # 静态资源
+│   ├── components/  # 公共组件
+│   ├── layouts/     # 布局组件
+│   ├── router/      # 路由配置
+│   ├── stores/      # Pinia 状态管理
+│   ├── types/       # TypeScript 类型定义
+│   ├── utils/       # 工具函数
+│   └── views/       # 页面组件
+├── public/          # 公共资源
+└── vite.config.ts   # Vite 配置文件
 ```
 
-- 前端：Vue 3 + Vue Router + Pinia + Element Plus
-- 后端：Spring Boot 3.x + Spring Security + MyBatis-Plus
-- 数据库：SQL Server 2022
-- 安全：Spring Security + JWT + RBAC
+## 功能规划
 
-1. 克隆仓库：
-   ```bash
-   git clone https://github.com/your-repo/blog.git
-   cd blog
-   # 前端安装
-   cd client && npm install
-   # 后端安装（Maven项目）
-   cd ../server && mvn clean install
+### 第一阶段：基础功能
+- [ ] 用户认证（登录/注册）
+- [ ] 文章列表展示
+- [ ] 文章详情页
+- [ ] 个人中心
+- [ ] 基础布局
+
+### 第二阶段：内容管理
+- [ ] 文章发布/编辑
+- [ ] 文章分类管理
+- [ ] 标签管理
+- [ ] 评论功能
+
+### 第三阶段：用户交互
+- [ ] 文章点赞
+- [ ] 文章收藏
+- [ ] 用户关注
+- [ ] 消息通知
+
+### 第四阶段：高级功能
+- [ ] 搜索功能
+- [ ] 数据统计
+- [ ] 主题切换
+- [ ] 移动端适配
+
+## 开发指南
+
+1. 安装依赖
+```bash
+npm install
+```
+
+2. 启动开发服务器
+```bash
+npm run dev
+```
+
+3. 构建生产版本
+```bash
+npm run build
+```
+
+## 代码规范
+
+- 使用 ESLint 进行代码检查
+- 使用 Prettier 进行代码格式化
+- 遵循 Vue 3 组合式 API 的最佳实践
+- 使用 TypeScript 类型注解
+- 组件和函数必须添加注释说明
+
+## 性能优化
+
+- 路由懒加载
+- 组件按需加载
+- 图片懒加载
+- 合理使用缓存
+- 代码分割

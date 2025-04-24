@@ -3,124 +3,32 @@ package com.example.blogbackend.service;
 import com.example.blogbackend.dto.AuthenticationRequest;
 import com.example.blogbackend.dto.AuthenticationResponse;
 import com.example.blogbackend.dto.RegisterRequest;
-import com.example.blogbackend.entity.Role;
-import com.example.blogbackend.entity.User;
-import com.example.blogbackend.entity.UserRole;
-import com.example.blogbackend.repository.RoleRepository;
-import com.example.blogbackend.repository.UserRepository;
-import com.example.blogbackend.repository.UserRoleRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
+/**
+ * 认证服务接口
+ */
+public interface AuthenticationService {
+    /**
+     * 用户注册
+     * @param request 注册请求
+     * @return 认证响应（包含token和用户信息）
+     * @throws RuntimeException 如果用户名或邮箱已存在
+     */
+    AuthenticationResponse register(RegisterRequest request);
 
-@Service
-@RequiredArgsConstructor
-public class AuthenticationService {
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final UserRoleRepository userRoleRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
+    /**
+     * 用户登录认证
+     * @param request 认证请求
+     * @return 认证响应（包含token和用户信息）
+     * @throws RuntimeException 如果用户不存在或密码错误
+     */
+    AuthenticationResponse authenticate(AuthenticationRequest request);
 
-    @Transactional
-    public AuthenticationResponse register(RegisterRequest request) {
-        // 检查用户名和邮箱是否已存在
-        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new RuntimeException("用户名已存在");
-        }
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("邮箱已存在");
-        }
-
-        var user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .bio(request.getBio())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        userRepository.insert(user);
-
-        // 为新用户分配ROLE_USER角色
-        var userRole = roleRepository.findByRoleName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("角色不存在"));
-
-        var userRoleRelation = UserRole.builder()
-                .userId(user.getUserId())
-                .roleId(userRole.getRoleId())
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        userRoleRepository.insert(userRoleRelation);
-
-        var jwtToken = jwtService.generateToken(user);
-        return AuthenticationResponse.builder()
-                .token(jwtToken)
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .avatar(user.getAvatar())
-                .bio(user.getBio())
-                .roles(List.of("ROLE_USER"))
-                .build();
-    }
-
-    public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        try {
-            // 先检查用户是否存在
-            var user = userRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new RuntimeException("用户不存在"));
-
-            // 尝试认证
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
-                            request.getPassword()
-                    )
-            );
-
-            // 查询用户角色
-            List<String> roles = userRoleRepository.findRolesByUserId(user.getUserId())
-                    .stream()
-                    .map(Role::getRoleName)
-                    .collect(Collectors.toList());
-
-            if (roles.isEmpty()) {
-                roles = List.of("ROLE_USER"); // 默认角色
-            }
-
-            var jwtToken = jwtService.generateToken(user);
-            return AuthenticationResponse.builder()
-                    .token(jwtToken)
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .avatar(user.getAvatar())
-                    .bio(user.getBio())
-                    .roles(roles)
-                    .build();
-        } catch (org.springframework.security.authentication.BadCredentialsException e) {
-            throw new RuntimeException("密码错误");
-        } catch (Exception e) {
-            throw new RuntimeException("登录失败: " + e.getMessage());
-        }
-    }
-
-    public void resetPassword(String email, String newPassword) {
-        var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
-        
-        user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdatedAt(LocalDateTime.now());
-        
-        userRepository.updateById(user);
-    }
+    /**
+     * 重置密码
+     * @param email 用户邮箱
+     * @param newPassword 新密码
+     * @throws RuntimeException 如果用户不存在
+     */
+    void resetPassword(String email, String newPassword);
 } 

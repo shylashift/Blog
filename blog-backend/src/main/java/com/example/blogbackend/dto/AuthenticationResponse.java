@@ -13,6 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 public class AuthenticationResponse {
     private String token;
+    private Integer userId;
     private String username;
     private String email;
     private String avatar;

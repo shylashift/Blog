@@ -1,114 +1,115 @@
 package com.example.blogbackend.service;
 
 import com.example.blogbackend.entity.Post;
-import com.example.blogbackend.repository.PostRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class PostService {
-    private final PostRepository postRepository;
+/**
+ * 文章服务接口
+ */
+public interface PostService {
+    /**
+     * 创建新文章
+     * @param post 文章信息
+     * @return 创建的文章
+     */
+    Post createPost(Post post);
 
-    @Transactional
-    public Post createPost(Post post) {
-        try {
-            log.info("开始创建文章，标题: {}", post.getTitle());
-            
-            // 验证文章内容
-            if (post.getTitle() == null || post.getTitle().trim().isEmpty()) {
-                throw new IllegalArgumentException("文章标题不能为空");
-            }
-            if (post.getContent() == null || post.getContent().trim().isEmpty()) {
-                throw new IllegalArgumentException("文章内容不能为空");
-            }
-            
-            // 设置时间
-            post.setCreatedAt(LocalDateTime.now());
-            post.setUpdatedAt(LocalDateTime.now());
-            
-            // 保存文章
-            log.info("保存文章到数据库");
-            int rows = postRepository.insert(post);
-            if (rows != 1) {
-                throw new RuntimeException("保存文章失败");
-            }
-            
-            // 查询完整的文章信息
-            Post createdPost = postRepository.findPostWithUser(post.getPostId());
-            if (createdPost == null) {
-                throw new RuntimeException("无法获取创建的文章信息");
-            }
-            
-            log.info("文章创建成功，ID: {}", createdPost.getPostId());
-            return createdPost;
-        } catch (Exception e) {
-            log.error("创建文章失败: {}", e.getMessage(), e);
-            throw new RuntimeException("创建文章失败: " + e.getMessage());
-        }
-    }
+    /**
+     * 获取所有文章
+     * @return 文章列表
+     */
+    List<Post> getAllPosts();
 
-    @Transactional(readOnly = true)
-    public List<Post> getAllPosts() {
-        log.info("开始获取所有文章");
-        long startTime = System.currentTimeMillis();
-        try {
-            return postRepository.findAllWithUser();
-        } catch (Exception e) {
-            log.error("获取文章列表失败", e);
-            throw e;
-        } finally {
-            log.info("获取文章列表完成，耗时: {}ms", System.currentTimeMillis() - startTime);
-        }
-    }
+    /**
+     * 根据ID获取文章
+     * @param postId 文章ID
+     * @return 文章信息
+     */
+    Post getPostById(Integer postId);
 
-    @Transactional(readOnly = true)
-    public Post getPostById(Integer postId) {
-        return postRepository.findPostWithUser(postId);
-    }
+    /**
+     * 获取用户的所有文章
+     * @param userId 用户ID
+     * @return 文章列表
+     */
+    List<Post> getPostsByUserId(Integer userId);
 
-    @Transactional(readOnly = true)
-    public List<Post> getPostsByUserId(Integer userId) {
-        return postRepository.findByUserId(userId);
-    }
+    /**
+     * 更新文章
+     * @param post 文章信息
+     * @return 更新后的文章
+     */
+    Post updatePost(Post post);
 
-    @Transactional
-    public Post updatePost(Post post) {
-        Post existingPost = postRepository.selectById(post.getPostId());
-        if (existingPost == null || !existingPost.getUserId().equals(post.getUserId())) {
-            throw new RuntimeException("无权修改此文章");
-        }
-        post.setUpdatedAt(LocalDateTime.now());
-        postRepository.updateById(post);
-        return postRepository.findPostWithUser(post.getPostId());
-    }
+    /**
+     * 删除文章
+     * @param postId 文章ID
+     */
+    void deletePost(Integer postId);
 
-    @Transactional
-    public void deletePost(Integer postId, Integer userId) {
-        Post post = postRepository.selectById(postId);
-        if (post == null || !post.getUserId().equals(userId)) {
-            throw new RuntimeException("无权删除此文章");
-        }
-        postRepository.deleteById(postId);
-    }
+    /**
+     * 获取所有标签
+     * @return 标签列表
+     */
+    List<String> getAllTags();
 
-    @Transactional(readOnly = true)
-    public List<String> getAllTags() {
-        log.info("开始获取所有标签");
-        long startTime = System.currentTimeMillis();
-        try {
-            return postRepository.findAllTags();
-        } catch (Exception e) {
-            log.error("获取标签列表失败", e);
-            throw e;
-        } finally {
-            log.info("获取标签列表完成，耗时: {}ms", System.currentTimeMillis() - startTime);
-        }
-    }
+    /**
+     * 根据标签获取文章
+     * @param tags 标签列表
+     * @param page 页码
+     * @param pageSize 每页数量
+     * @return 文章列表
+     */
+    List<Post> getPostsByTags(List<String> tags, int page, int pageSize);
+
+    /**
+     * 根据单个标签获取文章
+     * @param tag 标签
+     * @param offset 偏移量
+     * @param limit 限制数量
+     * @return 文章列表
+     */
+    List<Post> getPostsByTag(String tag, int offset, int limit);
+
+    /**
+     * 搜索文章
+     * @param keyword 关键词
+     * @param page 页码
+     * @param pageSize 每页数量
+     * @return 文章列表
+     */
+    List<Post> searchPosts(String keyword, int page, int pageSize);
+
+    /**
+     * 获取文章总数
+     * @param keyword 搜索关键词（如果有）
+     * @return 文章总数
+     */
+    int getPostCount(String keyword);
+
+    /**
+     * 获取所有文章（分页）
+     * @param offset 偏移量
+     * @param limit 限制数量
+     * @return 文章列表
+     */
+    List<Post> getAllPostsWithPagination(int offset, int limit);
+
+    /**
+     * 管理员删除文章（不检查权限）
+     * @param postId 文章ID
+     */
+    void deletePostByAdmin(Integer postId);
+
+    /**
+     * 隐藏文章
+     * @param postId 文章ID
+     */
+    void hidePost(Integer postId);
+
+    /**
+     * 显示文章
+     * @param postId 文章ID
+     */
+    void showPost(Integer postId);
 } 

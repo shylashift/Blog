@@ -7,11 +7,11 @@ import Register from '@/views/Register.vue'
 import PostList from '@/views/PostList.vue'
 import PostDetail from '@/views/PostDetail.vue'
 import PostEditor from '@/views/PostEditor.vue'
-import Profile from '@/views/Profile.vue'
 import Messages from '@/views/Messages.vue'
+import { ElMessage } from 'element-plus'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes: [
     {
       path: '/',
@@ -62,11 +62,17 @@ const router = createRouter({
         {
           path: 'profile',
           name: 'profile',
-          component: Profile,
+          component: () => import('@/views/Profile.vue'),
           meta: {
             title: '个人中心',
             requiresAuth: true
           }
+        },
+        {
+          path: '/notifications',
+          name: 'notifications',
+          component: () => import('@/views/Notifications.vue'),
+          meta: { requiresAuth: true }
         },
         {
           path: '/messages',
@@ -76,6 +82,42 @@ const router = createRouter({
             requiresAuth: true,
             title: '学术交流中心'
           }
+        },
+        {
+          path: '/admin',
+          component: () => import('@/views/admin/AdminDashboard.vue'),
+          meta: { requiresAuth: true, requiresAdmin: true },
+          children: [
+            {
+              path: '',
+              name: 'admin-dashboard',
+              component: () => import('@/views/admin/Dashboard.vue')
+            },
+            {
+              path: 'users',
+              name: 'admin-users',
+              component: () => import('@/views/admin/UserManagement.vue')
+            },
+            {
+              path: 'posts',
+              name: 'admin-posts',
+              component: () => import('@/views/admin/PostManagement.vue')
+            },
+            {
+              path: 'comments',
+              name: 'admin-comments',
+              component: () => import('@/views/admin/CommentManagement.vue')
+            }
+          ]
+        },
+        {
+          path: '/ai-chat',
+          name: 'ai-chat',
+          component: () => import('@/views/AIChat.vue'),
+          meta: { 
+            requiresAuth: true,
+            title: 'AI交流'
+           }
         }
       ]
     },
@@ -94,19 +136,49 @@ const router = createRouter({
       meta: {
         title: '注册'
       }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/'
     }
   ]
 })
 
-router.beforeEach((to, from, next) => {
+// 路由守卫
+router.beforeEach(async (to, _from, next) => {
   // 设置页面标题
-  document.title = `${to.meta.title} - 我的博客`
+  document.title = `${to.meta.title || '学术博客'} - 博客系统`
 
-  // 检查是否需要登录
   const userStore = useUserStore()
-  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    next('/login')
-  } else {
+  
+  try {
+    // 确保用户状态已初始化
+    if (!userStore.initialized) {
+      await userStore.initialize()
+    }
+
+    // 检查是否需要登录
+    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+      ElMessage.warning('请先登录')
+      return next({ path: '/login', query: { redirect: to.fullPath } })
+    } 
+    // 检查是否需要管理员权限
+    else if (to.meta.requiresAdmin) {
+      const roles = userStore.userInfo?.roles || []
+      const isAdmin = roles.some(role => role === 'ROLE_ADMIN' || role === '管理员')
+      
+      if (!isAdmin) {
+        ElMessage.warning('您没有管理员权限，无法访问此页面')
+        return next('/')
+      }
+    }
+    
+    next()
+  } catch (error) {
+    console.error('路由守卫初始化失败:', error)
+    if (to.meta.requiresAuth) {
+      return next('/login')
+    }
     next()
   }
 })

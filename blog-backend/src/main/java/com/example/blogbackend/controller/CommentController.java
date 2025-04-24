@@ -33,6 +33,12 @@ public class CommentController {
         return ResponseEntity.ok(comments);
     }
 
+    @GetMapping("/user")
+    public ResponseEntity<List<Comment>> getUserComments(@AuthenticationPrincipal User user) {
+        List<Comment> comments = commentService.getCommentsByUserId(user.getUserId());
+        return ResponseEntity.ok(comments);
+    }
+
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(
             @AuthenticationPrincipal User user,

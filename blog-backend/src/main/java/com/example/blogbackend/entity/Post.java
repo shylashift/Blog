@@ -10,14 +10,20 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @TableName("Posts")
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Post {
     @TableId(value = "PostId", type = IdType.AUTO)
     private Integer postId;
@@ -39,11 +45,60 @@ public class Post {
     private String summary;
     
     @TableField("CreatedAt")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime createdAt;
     
     @TableField("UpdatedAt")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime updatedAt;
 
     @TableField(exist = false)
     private User user;
+
+    @TableField(exist = false)
+    private User author;
+
+    @TableField("Tags")
+    private String tags;
+
+    @TableField("AuthorName")
+    private String authorName;
+
+    @TableField("IsHidden")
+    private Boolean isHidden;
+
+    @TableField("IsDeleted")
+    private Boolean isDeleted;
+
+    @TableField("AuthorAvatar")
+    private String authorAvatar;
+
+    @TableField(exist = false)
+    private List<Comment> comments;
+    
+    @TableField(exist = false)
+    private Integer commentCount;
+
+    @TableField(exist = false)
+    private String status;
+
+    public List<String> getTagsList() {
+        if (tags == null || tags.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.asList(tags.split("[,，\\s]+"));
+    }
+
+    public void setTagsList(List<String> tagsList) {
+        if (tagsList == null || tagsList.isEmpty()) {
+            this.tags = "";
+        } else {
+            // 过滤掉空标签，并去除首尾空格
+            List<String> cleanedTags = tagsList.stream()
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+            this.tags = String.join(",", cleanedTags);
+        }
+    }
 } 

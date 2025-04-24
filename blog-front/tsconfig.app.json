@@ -8,6 +8,9 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["element-plus/global", "vue-cropper"]
+    "types": ["element-plus/global", "vue-cropper"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true
   }
 }

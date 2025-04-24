@@ -3,8 +3,11 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { register } from '@/api/user'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
@@ -27,7 +30,7 @@ const rules: FormRules = {
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
+      validator: (value, callback) => {
         if (value !== form.value.password) {
           callback(new Error('两次输入的密码不一致'))
         } else {
@@ -50,27 +53,33 @@ const handleRegister = async (formEl: FormInstance | undefined) => {
     if (valid) {
       loading.value = true
       try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            username: form.value.username,
-            password: form.value.password,
-            email: form.value.email
-          })
+        const response = await register({
+          username: form.value.username,
+          password: form.value.password,
+          email: form.value.email
         })
 
-        if (!response.ok) {
-          throw new Error('注册失败')
+        if (response && response.token) {
+          userStore.setToken(response.token)
+          userStore.setUserInfo({
+            userId: response.userId,
+            username: response.username,
+            email: response.email,
+            avatar: response.avatar || '',
+            bio: response.bio || '',
+            roles: response.roles,
+            disabled: false,
+            muteEndTime: null
+          })
+          ElMessage.success('注册成功，已为您自动登录')
+          router.push('/')
+        } else {
+          ElMessage.success('注册成功，请登录')
+          router.push('/login')
         }
-
-        ElMessage.success('注册成功，请登录')
-        router.push('/login')
-      } catch (error) {
+      } catch (error: any) {
         console.error('注册错误:', error)
-        ElMessage.error('注册失败，请稍后重试')
+        ElMessage.error(error.response?.data?.message || '注册失败，请稍后重试')
       } finally {
         loading.value = false
       }

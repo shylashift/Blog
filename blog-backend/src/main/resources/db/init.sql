@@ -7,7 +7,8 @@ CREATE TABLE Users (
     Avatar NVARCHAR(200),
     Bio NVARCHAR(500),
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    Disabled BIT NOT NULL DEFAULT 0
 );
 
 -- 文章表
@@ -19,6 +20,7 @@ CREATE TABLE Posts (
     Summary NVARCHAR(500),
     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
     UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    IsHidden BIT NOT NULL DEFAULT 0,
     FOREIGN KEY (UserId) REFERENCES Users(UserId)
 );
 
@@ -125,3 +127,37 @@ INSERT INTO UserRoles (UserId, RoleId)
 SELECT u.UserId, r.RoleId
 FROM Users u, Roles r
 WHERE u.Username = 'admin' AND r.RoleName = 'ROLE_ADMIN';
+
+-- 修改 Posts 表，添加 Tags 字段
+ALTER TABLE Posts ADD
+    Tags NVARCHAR(500);  -- 用于存储逗号分隔的标签字符串
+
+-- 创建标签统计视图（可选）
+CREATE VIEW TagStats AS
+SELECT 
+    value AS TagName,
+    COUNT(*) AS TagCount
+FROM Posts
+CROSS APPLY STRING_SPLIT(Tags, ',')
+WHERE Tags IS NOT NULL
+GROUP BY value;
+
+-- 添加作者相关字段
+ALTER TABLE Posts
+ADD AuthorName NVARCHAR(100),
+    AuthorAvatar NVARCHAR(500);
+
+-- 更新现有记录的作者信息
+UPDATE p
+SET p.AuthorName = u.Username,
+    p.AuthorAvatar = u.Avatar
+FROM Posts p
+JOIN Users u ON p.UserId = u.UserId;
+
+-- 添加用户禁用字段
+ALTER TABLE Users
+ADD Disabled BIT NOT NULL DEFAULT 0;
+
+-- 添加文章隐藏字段
+ALTER TABLE Posts
+ADD IsHidden BIT NOT NULL DEFAULT 0;

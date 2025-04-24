@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -9,7 +8,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const handleStartWriting = () => {
-  if (!userStore.isAuthenticated) {
+  if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录后再开始写作')
     router.push('/login')
     return
@@ -18,13 +17,23 @@ const handleStartWriting = () => {
 }
 
 const handleViewMessages = () => {
-  if (!userStore.isAuthenticated) {
+  if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录后查看消息')
     router.push('/login')
     return
   }
   router.push('/messages')
 }
+
+const handleViewNotifications = () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后查看消息')
+    router.push('/login')
+    return
+  }
+  router.push('/notifications')
+}
+
 </script>
 
 <template>
@@ -49,14 +58,14 @@ const handleViewMessages = () => {
           <h3>轻松写作</h3>
           <p>支持 Markdown 编辑器，让写作变得简单愉悦</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" @click="handleViewNotifications">
           <el-icon class="feature-icon"><Share /></el-icon>
-          <h3>知识分享</h3>
-          <p>分享你的见解，让知识产生更大的价值</p>
+          <h3>信息通知</h3>
+          <p>让你了解其他学者对你的文章的评论和反馈</p>
         </div>
         <div class="feature-card" @click="handleViewMessages">
           <el-icon class="feature-icon"><Comment /></el-icon>
-          <h3>学术交流</h3>
+          <h3>评论中心</h3>
           <p>与志同道合的学者交流讨论，收藏有价值的文章</p>
         </div>
       </div>
@@ -66,6 +75,7 @@ const handleViewMessages = () => {
 
 <style scoped>
 .home-container {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
@@ -74,17 +84,18 @@ const handleViewMessages = () => {
 .hero-section {
   text-align: center;
   padding: 60px 0;
+  width: 100%;
 }
 
 .hero-section h1 {
-  font-size: 2.5rem;
-  color: var(--text-color);
+  font-size: 3rem;
+  color: var(--el-text-color-primary);
   margin-bottom: 20px;
 }
 
 .subtitle {
-  font-size: 1.2rem;
-  color: var(--text-color-secondary);
+  font-size: 1.5rem;
+  color: var(--el-text-color-secondary);
   margin-bottom: 40px;
 }
 
@@ -96,12 +107,13 @@ const handleViewMessages = () => {
 
 .features-section {
   padding: 60px 0;
+  width: 100%;
 }
 
 .features-section h2 {
   text-align: center;
-  font-size: 2rem;
-  color: var(--text-color);
+  font-size: 2.5rem;
+  color: var(--el-text-color-primary);
   margin-bottom: 40px;
 }
 
@@ -109,6 +121,7 @@ const handleViewMessages = () => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 30px;
+  width: 100%;
 }
 
 .feature-card {

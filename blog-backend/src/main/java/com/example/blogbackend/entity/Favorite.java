@@ -17,10 +17,16 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @TableName("Favorites")
 public class Favorite {
-    @TableId(type = IdType.AUTO)
+    @TableId(value = "FavoriteId", type = IdType.AUTO)
     private Integer favoriteId;
+
+    @TableField("UserId")
     private Integer userId;
+
+    @TableField("PostId")
     private Integer postId;
+
+    @TableField("CreatedAt")
     private LocalDateTime createdAt;
 
     @TableField(exist = false)

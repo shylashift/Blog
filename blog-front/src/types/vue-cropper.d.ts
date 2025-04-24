@@ -1,17 +1,10 @@
-declare module 'vue-cropper' {
+declare module 'vue-cropper/dist/vue-cropper.es.js' {
   import { DefineComponent } from 'vue'
+  const component: DefineComponent<{}, {}, any>
+  export default component
+}
 
-  export const VueCropper: DefineComponent<{
-    src: string
-    aspectRatio?: number
-    viewMode?: number
-    guides?: boolean
-    center?: boolean
-    highlight?: boolean
-    background?: boolean
-    autoCropArea?: number
-    rotatable?: boolean
-    zoomable?: boolean
-    movable?: boolean
-  }>
+declare module 'vue-cropper' {
+  import VueCropper from 'vue-cropper/dist/vue-cropper.es.js'
+  export default VueCropper
 } 

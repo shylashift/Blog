@@ -1,87 +1,173 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
+import { User, Lock, View, Hide } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
+import { setUserEmail } from '@/utils/debug'
+import { login } from '@/api/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
+const route = useRoute()
 
 const loginForm = ref({
-  username: '',
+  email: '',
   password: ''
 })
 
 const loading = ref(false)
 const showPassword = ref(false)
+const rememberMe = ref(false)
 
-const handleLogin = async () => {
-  if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.warning('请输入用户名和密码')
+// 在组件挂载时检查是否有保存的邮箱
+onMounted(() => {
+  const savedEmail = localStorage.getItem('rememberedEmail')
+  if (savedEmail) {
+    loginForm.value.email = savedEmail
+    rememberMe.value = true
+  }
+})
+
+const handleLogin = () => {
+  if (!loginForm.value.email || !loginForm.value.email.trim()) {
+    ElMessage.error('请输入邮箱')
     return
   }
-
-  loading.value = true
-  try {
-    const success = await userStore.login(
-      loginForm.value.username,
-      loginForm.value.password
-    )
-
-    if (success) {
-      ElMessage.success('登录成功')
-      router.push('/')
-    } else {
-      ElMessage.error('登录失败，请检查用户名和密码')
-    }
-  } catch (error) {
-    ElMessage.error('登录过程中发生错误')
-  } finally {
-    loading.value = false
+  
+  if (!loginForm.value.password || !loginForm.value.password.trim()) {
+    ElMessage.error('请输入密码')
+    return
   }
+  
+  loading.value = true
+  
+  // 保存用户邮箱用于调试
+  setUserEmail(loginForm.value.email)
+  
+  // 处理记住我功能
+  if (rememberMe.value) {
+    localStorage.setItem('rememberedEmail', loginForm.value.email)
+  } else {
+    localStorage.removeItem('rememberedEmail')
+  }
+  
+  login(loginForm.value.email, loginForm.value.password)
+    .then(response => {
+      console.log('Login response:', response)
+      
+      // 直接使用响应中的字段
+      const { token, username, email, avatar, bio, roles = [] } = response || {}
+      
+      if (!token) {
+        throw new Error('登录响应缺少token')
+      }
+      
+      // 转换为符合UserInfo接口的对象
+      const userInfo = {
+        userId: response.userId || 0,  // 使用响应中的userId
+        username: username || '用户',
+        email: email || loginForm.value.email,
+        avatar: avatar || null,
+        bio: bio || '',
+        roles: Array.isArray(roles) ? roles : [],
+        disabled: false,  // 默认未禁用
+        muteEndTime: null // 默认无禁言时间
+      }
+      
+      // 如果没有角色信息，但邮箱包含admin，给予管理员角色
+      if (userInfo.roles.length === 0 && loginForm.value.email.includes('admin')) {
+        userInfo.roles = ['ROLE_ADMIN']
+      }
+      
+      // 存储用户信息和token
+      userStore.setToken(token)
+      userStore.setUserInfo(userInfo)
+      
+      ElMessage.success('登录成功')
+      
+      // 根据查询参数进行重定向
+      const redirect = route.query.redirect as string
+      if (redirect) {
+        router.push(redirect)
+      } else {
+        router.push('/')
+      }
+    })
+    .catch(error => {
+      console.error('登录失败:', error)
+      ElMessage.error(error.message || '登录失败，请稍后再试')
+    })
+    .finally(() => {
+      loading.value = false
+    })
+}
+
+const handleRegister = () => {
+  router.push('/register')
 }
 </script>
 
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h2>登录</h2>
-      <el-form :model="loginForm" label-position="top">
-        <el-form-item label="用户名">
+      <div class="login-header">
+        <img src="../assets/logo.svg" alt="Logo" class="login-logo" />
+        <h2 class="login-title">欢迎回来</h2>
+        <p class="login-subtitle">登录您的账号以继续</p>
+      </div>
+      
+      <el-form class="login-form" @submit.prevent="handleLogin">
+        <el-form-item>
           <el-input
-            v-model="loginForm.username"
-            placeholder="请输入用户名"
-            @keyup.enter="handleLogin"
+            v-model="loginForm.email"
+            placeholder="请输入邮箱地址"
+            type="email"
+            :prefix-icon="User"
+            autocomplete="email"
+            size="large"
           />
         </el-form-item>
-        <el-form-item label="密码">
+
+        <el-form-item>
           <el-input
             v-model="loginForm.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="请输入密码"
+            :prefix-icon="Lock"
+            size="large"
             @keyup.enter="handleLogin"
           >
             <template #suffix>
               <el-icon 
-                class="password-icon" 
+                class="cursor-pointer" 
                 @click="showPassword = !showPassword"
               >
-                <View v-if="showPassword" />
-                <Hide v-else />
+                <component :is="showPassword ? View : Hide" />
               </el-icon>
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item>
-          <el-button
-            type="primary"
-            :loading="loading"
-            @click="handleLogin"
-            style="width: 100%"
-          >
-            登录
-          </el-button>
-        </el-form-item>
+
+        <div class="login-options">
+          <el-checkbox v-model="rememberMe" size="large">记住我</el-checkbox>
+        </div>
+
+        <el-button
+          type="primary"
+          :loading="loading"
+          class="login-button"
+          size="large"
+          @click="handleLogin"
+        >
+          {{ loading ? '登录中...' : '登录' }}
+        </el-button>
+
+        <div class="register-link">
+          还没有账号？
+          <el-button link type="primary" @click="handleRegister">立即注册</el-button>
+        </div>
       </el-form>
     </div>
   </div>
@@ -93,30 +179,125 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
 }
 
 .login-box {
   width: 100%;
-  max-width: 400px;
-  padding: 40px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  max-width: 420px;
+  padding: 2.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
 }
 
-h2 {
+.login-header {
   text-align: center;
-  margin-bottom: 30px;
-  color: #303133;
+  margin-bottom: 2rem;
 }
 
-.password-icon {
+.login-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1rem;
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+}
+
+.login-subtitle {
+  color: #666;
+  font-size: 16px;
+}
+
+.login-form {
+  margin-top: 1.5rem;
+}
+
+.login-form :deep(.el-input__wrapper) {
+  padding: 0 12px;
+  height: 48px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.login-form :deep(.el-input__inner) {
+  height: 48px;
+  font-size: 16px;
+}
+
+.login-form :deep(.el-input__prefix-inner) {
+  font-size: 20px;
+  margin-right: 12px;
+}
+
+.login-form :deep(.el-input__suffix) {
   cursor: pointer;
-  color: #909399;
+  font-size: 20px;
+  margin-left: 8px;
+  color: #666;
+  transition: color 0.2s;
 }
 
-.password-icon:hover {
-  color: #409EFF;
+.login-form :deep(.el-input__suffix:hover) {
+  color: #409eff;
+}
+
+.login-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1.5rem 0;
+}
+
+.login-button {
+  width: 100%;
+  height: 48px;
+  font-size: 16px;
+  border-radius: 8px;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  transition: transform 0.2s;
+}
+
+.login-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #666;
+  font-size: 15px;
+}
+
+:deep(.el-checkbox__label) {
+  font-size: 15px;
+}
+
+:deep(.el-link) {
+  font-size: 15px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .login-box {
+    margin: 1rem;
+    padding: 2rem;
+  }
 }
 </style> 

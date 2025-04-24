@@ -2,9 +2,15 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { FormInstance } from 'element-plus'
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
+import { getPostById, createPost, updatePost } from '@/api/posts'
+import { useUserStore } from '@/stores/user'
+import axios from 'axios'
+import { BASE_URL } from '@/utils/constants'
+import RichTextEditor from '@/components/RichTextEditor.vue'
+import TurndownService from 'turndown'
+import showdown from 'showdown'
 
 interface PostForm {
   title: string
@@ -13,17 +19,11 @@ interface PostForm {
   summary: string
 }
 
-interface PostResponse extends PostForm {
-  id: number
-  author: string
-  createdAt: string
-}
-
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const isEdit = ref(false)
-const inputRef = ref<HTMLInputElement>()
 
 const postForm = ref<PostForm>({
   title: '',
@@ -32,21 +32,23 @@ const postForm = ref<PostForm>({
   summary: ''
 })
 
-const formRules = {
-  title: [
-    { required: true, message: '请输入文章标题', trigger: 'blur' },
-    { min: 2, max: 100, message: '标题长度应在2-100个字符之间', trigger: 'blur' }
-  ],
-  content: [
-    { required: true, message: '请输入文章内容', trigger: 'blur' },
-    { min: 10, message: '内容至少需要10个字符', trigger: 'blur' }
-  ]
-}
-
-const formRef = ref<FormInstance>()
 const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const tagInputRef = ref()
+
+const editorType = ref('markdown')
+const handleEditorTypeChange = () => {
+  // 在切换编辑器时保持内容同步
+  if (editorType.value === 'markdown') {
+    // 如果从富文本切换到Markdown，需要将HTML转换为Markdown
+    const turndownService = new TurndownService()
+    postForm.value.content = turndownService.turndown(postForm.value.content)
+  } else {
+    // 如果从Markdown切换到富文本，需要将Markdown转换为HTML
+    const showdownConverter = new showdown.Converter()
+    postForm.value.content = showdownConverter.makeHtml(postForm.value.content)
+  }
+}
 
 const handleClose = (tag: string) => {
   postForm.value.tags = postForm.value.tags.filter(t => t !== tag)
@@ -72,13 +74,11 @@ const handleTagInputConfirm = () => {
 const fetchPost = async (id: string) => {
   try {
     loading.value = true
-    const response = await fetch(`/api/posts/${id}`)
-    if (!response.ok) throw new Error('获取文章失败')
-    const data: PostResponse = await response.json()
+    const data = await getPostById(parseInt(id))
     postForm.value = {
       title: data.title,
       content: data.content,
-      tags: data.tags || [],
+      tags: typeof data.tags === 'string' ? data.tags.split(/[,，\s]+/).filter(Boolean) : (data.tags || []),
       summary: data.summary || ''
     }
   } catch (error) {
@@ -99,23 +99,24 @@ const handleSubmit = async () => {
     return
   }
 
+  if (!userStore.isLoggedIn) {
+    ElMessage.error('请先登录')
+    router.push('/login')
+    return
+  }
+
   try {
     loading.value = true
-    const url = isEdit.value ? `/api/posts/${route.params.id}` : '/api/posts'
-    const method = isEdit.value ? 'PUT' : 'POST'
+    await userStore.initialize()
     
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(postForm.value)
-    })
-
-    if (!response.ok) throw new Error('保存文章失败')
-    
-    ElMessage.success(isEdit.value ? '更新成功' : '发布成功')
+    if (isEdit.value) {
+      const postId = parseInt(route.params.id as string)
+      await updatePost(postId, postForm.value)
+      ElMessage.success('更新成功')
+    } else {
+      await createPost(postForm.value)
+      ElMessage.success('发布成功')
+    }
     router.push('/posts')
   } catch (error) {
     console.error('保存文章错误:', error)
@@ -125,7 +126,64 @@ const handleSubmit = async () => {
   }
 }
 
+const handleUploadImage = async (files: File[], callback: (urls: string[]) => void) => {
+  try {
+    const uploadPromises = files.map(async (file) => {
+      // 检查文件类型
+      if (!file.type.startsWith('image/')) {
+        ElMessage.error('只能上传图片文件')
+        return ''
+      }
+
+      // 检查文件大小（最大5MB）
+      if (file.size > 5 * 1024 * 1024) {
+        ElMessage.error('图片大小不能超过5MB')
+        return ''
+      }
+
+      const formData = new FormData()
+      formData.append('image', file)
+
+      // 获取token
+      const token = localStorage.getItem('token')
+      if (!token) {
+        ElMessage.error('请先登录')
+        return ''
+      }
+
+      const response = await axios.post(`${BASE_URL}/posts/upload-image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `${token}`
+        }
+      })
+
+      if (response.data.code === 200) {
+        return `${BASE_URL}${response.data.data}`
+      } else {
+        ElMessage.error('图片上传失败')
+        return ''
+      }
+    })
+
+    const urls = await Promise.all(uploadPromises)
+    const validUrls = urls.filter(url => url !== '')
+    callback(validUrls)
+  } catch (error) {
+    console.error('图片上传错误:', error)
+    ElMessage.error('图片上传失败')
+  }
+}
+
 onMounted(async () => {
+  await userStore.initialize()
+  
+  if (!userStore.isLoggedIn) {
+    ElMessage.error('请先登录')
+    router.push('/login')
+    return
+  }
+
   const id = route.params.id
   if (id) {
     isEdit.value = true
@@ -195,12 +253,27 @@ onMounted(async () => {
           </div>
         </el-form-item>
 
+        <el-form-item label="编辑器类型">
+          <el-radio-group v-model="editorType" @change="handleEditorTypeChange">
+            <el-radio label="markdown">Markdown编辑器</el-radio>
+            <el-radio label="richtext">富文本编辑器</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
         <el-form-item label="文章内容">
-          <MdEditor
-            v-model="postForm.content"
-            preview-theme="github"
-            style="height: 500px"
-          />
+          <div v-if="editorType === 'markdown'" class="editor-container">
+            <MdEditor
+              v-model="postForm.content"
+              preview-theme="github"
+              style="height: 500px; width: 100%;"
+              :onUploadImg="handleUploadImage"
+            />
+          </div>
+          <div v-else class="editor-container">
+            <RichTextEditor
+              v-model="postForm.content"
+            />
+          </div>
         </el-form-item>
 
         <el-form-item>
@@ -220,28 +293,63 @@ onMounted(async () => {
 
 <style scoped>
 .post-editor {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 40px;
+  background-color: var(--el-bg-color);
+  box-shadow: none;
+  border-radius: 0;
+  box-sizing: border-box;
 }
 
 .editor-header {
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .editor-header h2 {
   margin: 0;
-  color: var(--text-color);
-  font-size: 1.8rem;
+  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .editor-form {
-  margin-top: 20px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.editor-form :deep(.el-form) {
+  width: 100%;
+}
+
+.editor-form :deep(.el-form-item) {
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.editor-form :deep(.el-form-item__label) {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--el-text-color-primary);
+}
+
+.editor-form :deep(.el-input__wrapper),
+.editor-form :deep(.el-textarea__wrapper) {
+  box-shadow: none;
+  border: 1px solid var(--el-border-color);
+}
+
+.editor-form :deep(.el-input__wrapper:hover),
+.editor-form :deep(.el-textarea__wrapper:hover) {
+  border-color: var(--el-border-color-hover);
+}
+
+.editor-form :deep(.el-input__wrapper:focus-within),
+.editor-form :deep(.el-textarea__wrapper:focus-within) {
+  border-color: var(--el-color-primary);
 }
 
 .tags-container {
@@ -249,30 +357,82 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  padding: 8px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  min-height: 36px;
 }
 
 .el-tag {
-  margin-right: 8px;
-  margin-bottom: 8px;
+  margin: 0;
+  height: 28px;
+  line-height: 26px;
+  border-radius: 4px;
 }
 
 .tag-input {
-  width: 100px;
-  margin-right: 8px;
+  width: 120px;
+  margin: 0;
   vertical-align: bottom;
 }
 
 .button-new-tag {
-  margin-bottom: 8px;
+  margin: 0;
+  height: 28px;
+  padding: 0 12px;
+}
+
+.editor-container {
+  width: 100%;
+  display: block;
+}
+
+.editor-container :deep(.md-editor) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 600px !important;
+  margin-top: 8px;
+  border: 1px solid var(--el-border-color) !important;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.editor-container :deep(.md-editor-area) {
+  width: 100% !important;
+}
+
+.editor-container :deep(.md-editor-preview) {
+  width: 100% !important;
+}
+
+.editor-container :deep(.tox.tox-tinymce) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 600px !important;
+  margin-top: 8px;
+  border: 1px solid var(--el-border-color) !important;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+:deep(.md-editor-toolbar) {
+  width: 100% !important;
+  border-bottom: 1px solid var(--el-border-color) !important;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
   .post-editor {
-    padding: 15px;
+    padding: 20px;
   }
 
   .editor-header h2 {
-    font-size: 1.5rem;
+    font-size: 20px;
+  }
+
+  .editor-container :deep(.md-editor),
+  .editor-container :deep(.tox.tox-tinymce) {
+    min-height: 400px !important;
   }
 }
 </style> 

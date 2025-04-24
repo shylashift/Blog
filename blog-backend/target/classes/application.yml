@@ -2,10 +2,13 @@ server:
   port: 8080
   servlet:
     context-path: /
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 spring:
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=BlogDB;encrypt=false
+    url: jdbc:sqlserver://localhost:1433;databaseName=BlogDB;encrypt=true;trustServerCertificate=true
     username: sa
     password: 123
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
@@ -15,12 +18,28 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+        use_sql_comments: true
+        type: trace
+        show_sql: true
+        generate_statistics: true
+        globally_quoted_identifiers: true
     database: sql_server
     database-platform: org.hibernate.dialect.SQLServer2012Dialect
+
+# 添加Hibernate的详细日志配置
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.type.descriptor.sql: TRACE
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -37,3 +56,8 @@ mybatis-plus:
 jwt:
   secret-key: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
   expiration: 86400000 # 一天 
+
+deepseek:
+  api:
+    key: sk-9bcae52a34314845a6b5b6fba5be1335
+    url: https://api.deepseek.com/v1 

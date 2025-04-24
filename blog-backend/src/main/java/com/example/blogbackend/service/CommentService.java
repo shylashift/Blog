@@ -1,64 +1,76 @@
 package com.example.blogbackend.service;
 
 import com.example.blogbackend.entity.Comment;
-import com.example.blogbackend.entity.Message;
-import com.example.blogbackend.entity.Post;
-import com.example.blogbackend.repository.CommentRepository;
-import com.example.blogbackend.repository.MessageRepository;
-import com.example.blogbackend.repository.PostRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
-public class CommentService {
-    private final CommentRepository commentRepository;
-    private final PostRepository postRepository;
-    private final MessageRepository messageRepository;
+/**
+ * 评论服务接口
+ */
+public interface CommentService {
+    /**
+     * 创建新评论
+     * @param comment 评论信息
+     * @return 创建的评论
+     */
+    Comment createComment(Comment comment);
 
-    @Transactional
-    public Comment createComment(Comment comment) {
-        // 检查文章是否存在
-        Post post = postRepository.selectById(comment.getPostId());
-        if (post == null) {
-            throw new RuntimeException("文章不存在");
-        }
+    /**
+     * 获取文章的所有评论
+     * @param postId 文章ID
+     * @return 评论列表
+     */
+    List<Comment> getCommentsByPostId(Integer postId);
 
-        comment.setCreatedAt(LocalDateTime.now());
-        comment.setUpdatedAt(LocalDateTime.now());
-        commentRepository.insert(comment);
+    /**
+     * 删除评论
+     * @param commentId 评论ID
+     * @param userId 用户ID（用于权限验证）
+     */
+    void deleteComment(Integer commentId, Integer userId);
 
-        // 创建消息通知文章作者
-        if (!post.getUserId().equals(comment.getUserId())) {
-            Message message = Message.builder()
-                    .userId(post.getUserId())
-                    .postId(post.getPostId())
-                    .commentId(comment.getCommentId())
-                    .type("comment")
-                    .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            messageRepository.insert(message);
-        }
+    /**
+     * 获取用户的所有评论
+     * @param userId 用户ID
+     * @return 评论列表
+     */
+    List<Comment> getCommentsByUserId(Integer userId);
 
-        return commentRepository.selectById(comment.getCommentId());
-    }
+    /**
+     * 更新评论
+     * @param comment 评论信息
+     * @return 更新后的评论
+     */
+    Comment updateComment(Comment comment);
 
-    @Transactional(readOnly = true)
-    public List<Comment> getCommentsByPostId(Integer postId) {
-        return commentRepository.findByPostIdWithUser(postId);
-    }
+    /**
+     * 获取文章的所有评论，包含用户信息
+     * @param postId 文章ID
+     * @return 评论列表（包含用户信息）
+     */
+    List<Comment> findCommentsByPostIdWithUser(Integer postId);
 
-    @Transactional
-    public void deleteComment(Integer commentId, Integer userId) {
-        Comment comment = commentRepository.selectById(commentId);
-        if (comment == null || !comment.getUserId().equals(userId)) {
-            throw new RuntimeException("无权删除此评论");
-        }
-        commentRepository.deleteById(commentId);
-    }
+    /**
+     * 获取所有评论（带用户和文章信息）
+     */
+    List<Comment> getAllCommentsWithDetails(String keyword, int offset, int size);
+
+    /**
+     * 获取评论总数
+     */
+    int getCommentCount(String keyword);
+
+    /**
+     * 删除评论
+     */
+    void deleteComment(Integer commentId);
+
+    /**
+     * 隐藏评论
+     */
+    void hideComment(Integer commentId);
+
+    /**
+     * 显示评论
+     */
+    void showComment(Integer commentId);
 } 
